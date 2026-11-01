@@ -46,11 +46,10 @@ Two things worth knowing before you pick numbers:
 
 <!-- Your criterion. It must name a number. -->
 
-
+Of 10 pieces I wrote myself (a mix of casual, plain and formal), at most 1 is labeled high-confidence AI, on each of three trials.
 
 **Why this target:**
-
-
+A wrong accusation costs a writer more than a missed detection costs the site, and 1 in 10 is the smallest rate I can measure with 10 pieces. I am not asking for zero because signal one scores plain writing as machine-like, but more than 1 would mean the AI label is being handed out too easily.
 
 ---
 
@@ -58,11 +57,10 @@ Two things worth knowing before you pick numbers:
 
 <!-- Your criterion. -->
 
-
+On 5 pairs of clearly-AI and clearly-human text, the AI text scores higher than its human partner in all 5 pairs, and the average gap in combined score is at least 0.30.
 
 **Why this target:**
-
-
+The unsure band runs from 0.35 to 0.65, which is 0.30 wide. A gap smaller than that means a typical clear pair never lands on opposite sides, and the labels would mostly be "unsure".
 
 ---
 
@@ -70,11 +68,10 @@ Two things worth knowing before you pick numbers:
 
 <!-- Your criterion. -->
 
-
+I can produce each of the three labels (high-confidence AI, high-confidence human, unsure) with a real submission on each of three trials, and scoring.label_ranges() shows no gap.
 
 **Why this target:**
-
-
+While style_signal returns a constant, the combined score can only reach 0.25 to 0.75, so "human" is nearly unreachable. A label no input can produce means the system is broken.
 
 ---
 
@@ -82,11 +79,10 @@ Two things worth knowing before you pick numbers:
 
 <!-- Your criterion. -->
 
-
+In 10 of 10 test appeals with a valid content_id, the status becomes under_review, and the appeal appears in GET /log with the original decision still there. An unknown content_id returns a 404 and writes nothing.
 
 **Why this target:**
-
-
+The appeal is the only recourse a falsely accused writer has, and it involves no model, so it is deterministic and I allow no misses.
 
 ---
 
@@ -94,11 +90,10 @@ Two things worth knowing before you pick numbers:
 
 <!-- Your criterion. -->
 
-
+Five bad inputs (missing text, empty string, whitespace only, 100,000 characters, and text under 3 tokens) each return a JSON error, 400 or 503 if the model is unavailable. All 5 do so without crashing or writing a decision entry.
 
 **Why this target:**
-
-
+model_signal raises an error on under 3 tokens and reads only 400 tokens, so a huge or empty input must be rejected cleanly instead of reaching the model.
 
 ---
 
