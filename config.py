@@ -47,6 +47,24 @@ DETECTOR_MODEL = os.getenv("AI201_DETECTOR_MODEL", "gpt2")
 DETECTOR_MAX_TOKENS = 400
 
 
+# ─── The style signal (Milestone 4) ──────────────────────────────────────────
+# Where each raw measure maps onto AI-likeness. A value at or below *_AI_AT
+# scores 1.0 (AI-like), at or above *_HUMAN_AT scores 0.0, and in between is a
+# straight line.
+#
+# ⚠️ These are heuristics to be tuned, not measured facts. Run the four
+# calibration inputs through `python stylometry.py "..."` and move them.
+
+SPREAD_AI_AT = 0.25       # stdev / mean of sentence lengths, in words
+SPREAD_HUMAN_AT = 0.65
+
+TTR_AI_AT = 0.55          # unique / total words, first 100 words only
+TTR_HUMAN_AT = 0.80
+
+PUNCT_AI_AT = 0.05        # non-full-stop punctuation marks per word
+PUNCT_HUMAN_AT = 0.25
+
+
 # ─── Scoring (Milestone 4) ───────────────────────────────────────────────────
 # How much each signal counts toward the combined score.
 #
@@ -54,8 +72,8 @@ DETECTOR_MAX_TOKENS = 400
 # down BEFORE you code it, and to put the numbers in your README. Whatever you
 # decide, it goes here.
 
-WEIGHT_MODEL_SIGNAL = 0.5
-WEIGHT_STYLE_SIGNAL = 0.5
+WEIGHT_MODEL_SIGNAL = 0.6
+WEIGHT_STYLE_SIGNAL = 0.4
 
 
 # ─── Thresholds (Milestone 5) ────────────────────────────────────────────────
@@ -71,8 +89,12 @@ WEIGHT_STYLE_SIGNAL = 0.5
 # getting through. There is no setting that avoids the trade — only settings
 # that decide who pays for it.
 
+# AI threshold raised to 0.75 after the four-input test: plain formal human
+# text scored 0.72, as high as clearly AI text (0.72), so 0.65 would label
+# formal human writing as AI. No threshold separates them, so I chose to
+# protect writers. Still a guess from four samples.
 HUMAN_THRESHOLD = 0.35
-AI_THRESHOLD = 0.65
+AI_THRESHOLD = 0.75
 
 # ⚠️ One thing that catches people out in Milestone 5. A weighted average can
 # only land between its two inputs — so while `style_signal` is still the stub

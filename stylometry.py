@@ -33,6 +33,16 @@ anything together:
 import re
 import statistics
 
+import config
+
+# The marks punctuation_density counts. Full stops and apostrophes are left
+# out: every writer uses full stops, and apostrophes are part of words.
+_PUNCTUATION = set(",;:-–—?!()\"“”")
+
+# Only the first this-many words go into the type-token ratio, so that a long
+# text doesn't score as repetitive just for being long.
+_TTR_WINDOW = 100
+
 
 def sentences(text: str) -> list[str]:
     """Split into sentences. Rough and good enough — given to you."""
@@ -49,60 +59,106 @@ def words(text: str) -> list[str]:
 
 def sentence_length_spread(text: str) -> float:
     """
-    How much sentence length varies. ← TODO
+    How much sentence length varies.
 
     Returns:
-        A float. Decide yourself what scale it's on and which direction means
-        "more human" — then write that down, because your combining rule
-        depends on knowing it.
+        The standard deviation of sentence lengths (in words) divided by their
+        mean — the coefficient of variation. 0.0 means every sentence is the
+        same length; higher means more varied, which points toward human.
 
-    A hint on what you're reaching for: the standard deviation of sentence
-    lengths, probably divided by the mean so a long text and a short one are
-    comparable. `statistics.stdev` is imported for you.
-
-    Watch the edge case: a one-sentence submission has no spread at all, and
-    `stdev` raises on fewer than two values. Decide what that should return
-    before the attack set decides for you.
+    Fewer than two sentences has no spread to measure and returns 0.0. Note
+    what that means downstream: a one-sentence submission looks maximally
+    even, so it scores as AI-like on this measure.
     """
-    # TODO: replace this
-    return 0.0
+    lengths = [len(words(s)) for s in sentences(text)]
+    if len(lengths) < 2:
+        return 0.0
+
+    mean = statistics.mean(lengths)
+    if mean == 0:
+        return 0.0
+
+    return statistics.stdev(lengths) / mean
 
 
 def type_token_ratio(text: str) -> float:
     """
-    Unique words over total words. ← TODO
+    Unique words over total words.
 
     Returns:
-        A float between 0 and 1. Higher means more varied vocabulary.
+        A float between 0 and 1. Higher means more varied vocabulary, which
+        points toward human. 0.0 for text with no words.
 
-    Worth knowing before you rely on it: this measure falls as text gets
-    longer, because common words repeat. Two texts of different lengths aren't
-    directly comparable on it, and if your test inputs vary a lot in length,
-    that alone can look like a signal.
+    This measure falls as text gets longer, because common words repeat, so
+    only the first 100 words are counted. Texts shorter than that are still
+    measured on all their words, so very short text tends to score high.
     """
-    # TODO: replace this
-    return 0.0
+    tokens = words(text)[:_TTR_WINDOW]
+    if not tokens:
+        return 0.0
+
+    return len(set(tokens)) / len(tokens)
 
 
 def punctuation_density(text: str) -> float:
     """
-    How much punctuation, relative to length. ← TODO
+    How much punctuation, relative to length.
 
     Returns:
-        A float. Whether you count all punctuation or only some kinds — commas,
-        semicolons, dashes — is a real choice. Semicolons and em dashes are
-        more interesting than full stops, because they vary more between
-        writers.
+        Punctuation marks per word. Counts commas, semicolons, colons, dashes,
+        question and exclamation marks, parentheses and double quotes — not
+        full stops or apostrophes. Higher points toward human. 0.0 for text
+        with no words.
+
+    Hyphens inside words ("well-known") count as dashes.
     """
-    # TODO: replace this
-    return 0.0
+    total_words = len(words(text))
+    if total_words == 0:
+        return 0.0
+
+    marks = sum(1 for ch in text if ch in _PUNCTUATION)
+    return marks / total_words
+
+
+def _ai_likeness(value: float, ai_at: float, human_at: float) -> float:
+    """
+    Map a raw measure onto 0–1, where 1.0 is AI-like.
+
+    At or below `ai_at` scores 1.0, at or above `human_at` scores 0.0, and
+    in between falls on a straight line.
+    """
+    if human_at == ai_at:
+        return 1.0 if value <= ai_at else 0.0
+
+    score = (human_at - value) / (human_at - ai_at)
+    return min(max(score, 0.0), 1.0)
+
+
+def ai_likenesses(text: str) -> dict[str, float]:
+    """Each measure's AI-likeness, 0–1, keyed by the measure's name."""
+    return {
+        "sentence_length_spread": _ai_likeness(
+            sentence_length_spread(text), config.SPREAD_AI_AT, config.SPREAD_HUMAN_AT
+        ),
+        "type_token_ratio": _ai_likeness(
+            type_token_ratio(text), config.TTR_AI_AT, config.TTR_HUMAN_AT
+        ),
+        "punctuation_density": _ai_likeness(
+            punctuation_density(text), config.PUNCT_AI_AT, config.PUNCT_HUMAN_AT
+        ),
+    }
 
 
 # ── Combining them ───────────────────────────────────────────────────────────
 
 def style_signal(text: str) -> float:
     """
-    The style signal as a 0–1 score. **Higher means more likely AI.** ← TODO
+    The style signal as a 0–1 score. **Higher means more likely AI.**
+
+    The rule: each of the three measures is mapped onto AI-likeness with a
+    clamped straight line between the anchors in config.py (low spread, low
+    vocabulary variety and low punctuation all point toward AI), and the three
+    AI-likenesses are averaged with equal weight.
 
     Combine your three measures into one number. Same direction as
     `detector.model_signal`, so that `scoring.combine_signals` can treat them
@@ -122,8 +178,8 @@ def style_signal(text: str) -> float:
     you trust it. Plain and ordinary, not formal: formal prose reads as *human*
     to signal one, and it is plain writing that gets accused.
     """
-    # TODO: replace this
-    return 0.5
+    scores = ai_likenesses(text)
+    return round(sum(scores.values()) / len(scores), 4)
 
 
 if __name__ == "__main__":
@@ -134,9 +190,13 @@ if __name__ == "__main__":
         "good results. Users generally find it easy to use and understand."
     )
 
+    likeness = ai_likenesses(text)
+
     print(f"{len(sentences(text))} sentences, {len(words(text))} words\n")
-    print(f"sentence_length_spread   {sentence_length_spread(text)}")
-    print(f"type_token_ratio         {type_token_ratio(text)}")
-    print(f"punctuation_density      {punctuation_density(text)}")
-    print(f"style_signal             {style_signal(text)}   (higher = more likely AI)")
-    print("\nAll zeros? These are stubs — Milestone 4 is where you build them.")
+    print(f"sentence_length_spread              {sentence_length_spread(text):.4f}")
+    print(f"type_token_ratio                    {type_token_ratio(text):.4f}")
+    print(f"punctuation_density                 {punctuation_density(text):.4f}")
+    print(f"sentence_length_spread AI-likeness  {likeness['sentence_length_spread']:.4f}")
+    print(f"type_token_ratio AI-likeness        {likeness['type_token_ratio']:.4f}")
+    print(f"punctuation_density AI-likeness     {likeness['punctuation_density']:.4f}")
+    print(f"style_signal                        {style_signal(text):.4f}   (higher = more likely AI)")

@@ -31,6 +31,8 @@ from flask import Flask, jsonify, request
 import audit
 import config
 import detector
+import scoring
+import stylometry
 
 app = Flask(__name__)
 
@@ -244,27 +246,30 @@ def submit():
             "message": "The checker isn't ready yet. Try again shortly.",
         }), 503
 
+    style_score = round(stylometry.style_signal(text), 4)
+    combined = round(scoring.combine_signals(model_score, style_score), 4)
+    guess, label = scoring.score_to_label(combined)
+
     content_id = str(uuid.uuid4())
 
-    # style_score and combined_score are placeholders until signal two and the
-    # combining rule exist (Milestone 4).
     audit.log_decision(
         content_id=content_id,
         creator_id=creator_id,
-        guess="unsure",
+        guess=guess,
         model_score=model_score,
-        style_score=None,
-        combined_score=model_score,
-        label="placeholder label",
+        style_score=style_score,
+        combined_score=combined,
+        label=label,
     )
 
     return jsonify({
         "content_id": content_id,
-        "guess": "unsure",
-        "confidence": 0.5,
-        "label": "placeholder label",
+        "guess": guess,
+        # The combined score for now; what "confidence" should mean is still open.
+        "confidence": combined,
+        "label": label,
         "model_score": model_score,
-        "style_score": None,
+        "style_score": style_score,
     })
 
 
