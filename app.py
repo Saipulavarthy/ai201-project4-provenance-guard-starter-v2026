@@ -293,14 +293,55 @@ def appeal():
     to the person on the other end. It's the only thing standing between a
     wrong accusation and nothing at all.
     """
-    payload = request.get_json(silent=True) or {}
+    payload = request.get_json(silent=True)
 
-    # TODO: delete this and build the route.
+    # A bare list or string parses as JSON but has no fields to read.
+    if not isinstance(payload, dict):
+        return jsonify({
+            "error": "bad_request",
+            "message": "The body must be a JSON object with \"content_id\" and \"reasoning\".",
+        }), 400
+
+    content_id = payload.get("content_id")
+    reasoning = payload.get("reasoning")
+
+    if not isinstance(content_id, str):
+        return jsonify({
+            "error": "bad_request",
+            "message": "\"content_id\" is missing or is not a string.",
+        }), 400
+    if not isinstance(reasoning, str):
+        return jsonify({
+            "error": "bad_request",
+            "message": "\"reasoning\" is missing or is not a string.",
+        }), 400
+
+    if not reasoning.strip():
+        return jsonify({
+            "error": "empty_reasoning",
+            "message": "\"reasoning\" is empty. Say why you think the label is wrong.",
+        }), 400
+
+    # entries_for also returns earlier appeals; the original decision is the
+    # entry with no "event" field.
+    decisions = [e for e in audit.entries_for(content_id) if "event" not in e]
+    if not decisions:
+        return jsonify({
+            "error": "unknown_content_id",
+            "message": "We couldn't find a submission with that content_id. Check it and try again.",
+        }), 404
+
+    audit.log_appeal(
+        content_id=content_id,
+        creator_id=decisions[0]["creator_id"],
+        reasoning=reasoning,
+    )
+
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /appeal isn't built yet — see the TODO in app.py.",
-        "you_sent": payload,
-    }), 501
+        "content_id": content_id,
+        "status": "under_review",
+        "message": "Your appeal has been recorded and this item is marked as under review.",
+    })
 
 
 # ── Already works ─────────────────────────────────────────────────────────────

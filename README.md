@@ -108,9 +108,11 @@ Findings from the second signal: sentence_length_spread reached its maximum on b
 
 | Label | Score range | The exact text a reader sees |
 |---|---|---|
-| high-confidence human |  |  |
-| unsure |  |  |
-| high-confidence AI |  |  |
+| high-confidence human | 0.00 to 0.35 | We think this was probably written by a person. No tool can be certain, so this is our best guess and not a verdict. |
+| unsure | 0.35 to 0.75 | We can't tell whether this was written by a person or with an AI tool. Plain or formal writing can look machine-made to our checks, so this is not a judgment about you or your work. If you wrote it yourself, you don't need to do anything. |
+| high-confidence AI | 0.75 to 1.00 | Our checks suggest this may have been written with an AI tool. We can be wrong, especially with short or plain writing. If you wrote it yourself, you can appeal, and your appeal will be recorded and the item marked as under review. |
+
+Scores exactly on 0.35 or 0.75 count as unsure.
 
 **Why I worded the "unsure" one this way:**
 <!-- It's the hardest of the three. It has to admit uncertainty without
@@ -126,18 +128,39 @@ Findings from the second signal: sentence_length_spread reached its maximum on b
 <!-- One submission and one appeal, pasted as text: the request, the response,
      and the log entries. -->
 
-**A submission**
+One submission and one appeal, pasted as text from the running service (port 5001, because port 5000 is taken by macOS AirPlay on my machine).
 
 <!-- The response needs content_id, guess, confidence, label, AND both
      signal scores - model_score and style_score. Unit 8's tools read those
      two off the response, so leaving them out costs you next unit's
      diagnostics. -->
 
-**Submission (POST /submit), milestone 3 state.** The response carries the real model_score from signal one. Confidence, label and style_score are still placeholders until milestones 4 and 5.
+**Submission (POST /submit)**
 
 Request:
 ```
-curl -i -X POST http://127.0.0.1:5001/submit -H "Content-Type: application/json" -d '{"text": "ok so my bus was late again and I swear the driver just stopped for a coffee, I am not even joking, we sat outside a bakery for like ten minutes. got to work wet and annoyed. my manager said nothing, which was worse.", "creator_id": "u1"}'
+curl -s -X POST http://127.0.0.1:5001/submit -H "Content-Type: application/json" -d '{"text": "The committee met on Tuesday to review the proposed changes to the budget. After some discussion, members agreed that the plan needed more detail before a vote could take place.", "creator_id": "label_ai"}'
+```
+
+Response:
+```
+{
+  "confidence": 0.7678,
+  "content_id": "d700f264-751b-462c-9f15-4be140171035",
+  "guess": "ai",
+  "label": "Our checks suggest this may have been written with an AI tool. We can be wrong, especially with short or plain writing. If you wrote it yourself, you can appeal, and your appeal will be recorded and the item marked as under review.",
+  "model_score": 0.8352,
+  "style_score": 0.6667
+}
+```
+
+This paragraph is plain, formal text that I wrote as a stand-in for human writing, and it was labeled high-confidence AI. That is the false positive described in What This Does, and it is a known failure of my system.
+
+**Appeal (POST /appeal)**
+
+Request:
+```
+curl -i -X POST http://127.0.0.1:5001/appeal -H "Content-Type: application/json" -d '{"content_id": "d700f264-751b-462c-9f15-4be140171035", "reasoning": "I wrote this paragraph myself for a budget meeting. It is short and formal because that is how I write minutes."}'
 ```
 
 Response:
@@ -146,55 +169,49 @@ HTTP/1.1 200 OK
 Content-Type: application/json
 
 {
-  "confidence": 0.5,
-  "content_id": "d5819a93-582f-4541-bf2a-f97fe49bf6cf",
-  "guess": "unsure",
-  "label": "placeholder label",
-  "model_score": 0.3156,
-  "style_score": null
+  "content_id": "d700f264-751b-462c-9f15-4be140171035",
+  "message": "Your appeal has been recorded and this item is marked as under review.",
+  "status": "under_review"
 }
 ```
 
-Log entry from GET /log for the same content_id:
+**Log entries (GET /log?limit=2)**
 ```
 {
-  "combined_score": 0.3156,
-  "content_id": "d5819a93-582f-4541-bf2a-f97fe49bf6cf",
-  "creator_id": "u1",
-  "guess": "unsure",
-  "label": "placeholder label",
-  "model_score": 0.3156,
+  "combined_score": 0.7678,
+  "content_id": "d700f264-751b-462c-9f15-4be140171035",
+  "creator_id": "label_ai",
+  "guess": "ai",
+  "label": "Our checks suggest this may have been written with an AI tool. We can be wrong, especially with short or plain writing. If you wrote it yourself, you can appeal, and your appeal will be recorded and the item marked as under review.",
+  "model_score": 0.8352,
   "status": "decided",
-  "style_score": null,
-  "timestamp": "2026-11-01T19:47:15+00:00"
+  "style_score": 0.6667,
+  "timestamp": "2026-11-01T20:23:03+00:00"
+}
+{
+  "content_id": "d700f264-751b-462c-9f15-4be140171035",
+  "creator_id": "label_ai",
+  "event": "appeal",
+  "reasoning": "I wrote this paragraph myself for a budget meeting. It is short and formal because that is how I write minutes.",
+  "status": "under_review",
+  "timestamp": "2026-11-01T20:25:08+00:00"
 }
 ```
 
-Bad input checks, same milestone: an empty text returns 400 {"error": "empty_text"}, a missing text field returns 400 {"error": "bad_request"}, and text under 3 tokens ("hi") returns 400 {"error": "text_too_short"}.
+The log only appends, so the original decision keeps status "decided" and the appeal is a second entry with status "under_review" for the same content_id.
 
-**An appeal**
+**All three labels reached with real submissions**
 
-Appeal sample: to be added in milestone 5.
+| Input | model_score | style_score | combined | guess |
+|---|---|---|---|---|
+| Casual first-person text about a late bus | 0.2339 | 0.3553 | 0.2825 | human |
+| Generic remote-work paragraph | 0.8049 | 0.5809 | 0.7153 | unsure |
+| Committee paragraph | 0.8352 | 0.6667 | 0.7678 | ai |
 
-```bash
-$ curl -X POST http://127.0.0.1:5000/appeal \
-  -H "Content-Type: application/json" \
-  -d '{"content_id": "...", "reasoning": "..."}'
-```
+**Error paths**
 
-```json
-
-```
-
-**What the log shows afterwards**
-
-```bash
-$ curl "http://127.0.0.1:5000/log?limit=3"
-```
-
-```json
-
-```
+- POST /submit with empty text returns 400 {"error": "empty_text"}, a missing text field returns 400 {"error": "bad_request"}, and text under 3 tokens returns 400 {"error": "text_too_short"}.
+- POST /appeal with an unknown content_id returns 404 {"error": "unknown_content_id"} and a missing reasoning returns 400 {"error": "bad_request"}. Neither writes anything to the log.
 
 ---
 
