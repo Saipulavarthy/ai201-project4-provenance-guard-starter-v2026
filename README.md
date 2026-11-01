@@ -129,17 +129,48 @@ POST /submit takes JSON {"text": string, "creator_id": string} and returns {"con
      two off the response, so leaving them out costs you next unit's
      diagnostics. -->
 
-```bash
-$ curl -X POST http://127.0.0.1:5000/submit \
-  -H "Content-Type: application/json" \
-  -d '{"text": "...", "creator_id": "..."}'
+**Submission (POST /submit), milestone 3 state.** The response carries the real model_score from signal one. Confidence, label and style_score are still placeholders until milestones 4 and 5.
+
+Request:
+```
+curl -i -X POST http://127.0.0.1:5001/submit -H "Content-Type: application/json" -d '{"text": "ok so my bus was late again and I swear the driver just stopped for a coffee, I am not even joking, we sat outside a bakery for like ten minutes. got to work wet and annoyed. my manager said nothing, which was worse.", "creator_id": "u1"}'
 ```
 
-```json
-
+Response:
 ```
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "confidence": 0.5,
+  "content_id": "d5819a93-582f-4541-bf2a-f97fe49bf6cf",
+  "guess": "unsure",
+  "label": "placeholder label",
+  "model_score": 0.3156,
+  "style_score": null
+}
+```
+
+Log entry from GET /log for the same content_id:
+```
+{
+  "combined_score": 0.3156,
+  "content_id": "d5819a93-582f-4541-bf2a-f97fe49bf6cf",
+  "creator_id": "u1",
+  "guess": "unsure",
+  "label": "placeholder label",
+  "model_score": 0.3156,
+  "status": "decided",
+  "style_score": null,
+  "timestamp": "2026-11-01T19:47:15+00:00"
+}
+```
+
+Bad input checks, same milestone: an empty text returns 400 {"error": "empty_text"}, a missing text field returns 400 {"error": "bad_request"}, and text under 3 tokens ("hi") returns 400 {"error": "text_too_short"}.
 
 **An appeal**
+
+Appeal sample: to be added in milestone 5.
 
 ```bash
 $ curl -X POST http://127.0.0.1:5000/appeal \

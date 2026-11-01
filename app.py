@@ -30,6 +30,7 @@ from flask import Flask, jsonify, request
 
 import audit
 import config
+import detector
 
 app = Flask(__name__)
 
@@ -199,17 +200,72 @@ def submit():
     what should this do when `text` is missing, empty, or enormous? A crash on
     a malformed input is one of the most common real failures there is.
     """
-    payload = request.get_json(silent=True) or {}
+    payload = request.get_json(silent=True)
 
-    # TODO: delete this and build the route.
+    # A bare list or string parses as JSON but has no fields to read.
+    if not isinstance(payload, dict):
+        return jsonify({
+            "error": "bad_request",
+            "message": "The body must be a JSON object with \"text\" and \"creator_id\".",
+        }), 400
+
+    text = payload.get("text")
+    creator_id = payload.get("creator_id")
+
+    if not isinstance(text, str):
+        return jsonify({
+            "error": "bad_request",
+            "message": "\"text\" is missing or is not a string.",
+        }), 400
+    if not isinstance(creator_id, str):
+        return jsonify({
+            "error": "bad_request",
+            "message": "\"creator_id\" is missing or is not a string.",
+        }), 400
+
+    if not text.strip():
+        return jsonify({
+            "error": "empty_text",
+            "message": "\"text\" is empty. Send some writing to check.",
+        }), 400
+
+    # The model loads once inside detector._load and stays in memory, so only
+    # the first submission pays the 10–20 second load.
+    try:
+        model_score = round(detector.model_signal(text), 4)
+    except ValueError:
+        return jsonify({
+            "error": "text_too_short",
+            "message": "This text is too short to check. Send a few sentences at least.",
+        }), 400
+    except detector.DetectorUnavailable:
+        return jsonify({
+            "error": "detector_unavailable",
+            "message": "The checker isn't ready yet. Try again shortly.",
+        }), 503
+
+    content_id = str(uuid.uuid4())
+
+    # style_score and combined_score are placeholders until signal two and the
+    # combining rule exist (Milestone 4).
+    audit.log_decision(
+        content_id=content_id,
+        creator_id=creator_id,
+        guess="unsure",
+        model_score=model_score,
+        style_score=None,
+        combined_score=model_score,
+        label="placeholder label",
+    )
+
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /submit isn't built yet — see the TODO in app.py.",
-        "you_sent": {
-            "text_length": len(payload.get("text", "")),
-            "creator_id": payload.get("creator_id"),
-        },
-    }), 501
+        "content_id": content_id,
+        "guess": "unsure",
+        "confidence": 0.5,
+        "label": "placeholder label",
+        "model_score": model_score,
+        "style_score": None,
+    })
 
 
 @app.post("/appeal")
