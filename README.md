@@ -229,24 +229,72 @@ How the code was written: the code in app.py, stylometry.py and scoring.py was w
 
 ## Rate Limiting
 
-**My limits:** ___ per minute, ___ per day
+Limits: 5 requests per minute and 50 per day on POST /submit, set in config.py as RATE_LIMIT_PER_MINUTE and RATE_LIMIT_PER_DAY, with RATE_LIMITING_ENABLED = True.
 
-**Why those numbers and not others:**
 <!-- Think about two people: a real writer submitting their own work a few
      times an hour, and a script sending a thousand variations to map your
      thresholds. Your numbers have to be liveable for the first and hostile to
      the second. -->
 
-**What a caller counts as:** <!-- per address, or per creator_id? They fail
+Why these numbers: a real writer submits a few pieces of work an hour, so 5 a minute is above anything a person pastes by hand, and a person who hits it only has to wait a minute. A script mapping my thresholds would send many variations in quick succession. The per-minute limit slows that to 5 probes a minute, and the per-day limit caps it at 50 a day. I did not choose a stricter limit because a wrongly blocked writer cannot submit their own work at all, and I did not choose a looser one because the cost of each submission is a local model run.
+
+<!-- per address, or per creator_id? They fail
 differently — one script can look like a thousand callers, and one household
 can look like one. -->
 
-**The run of status codes when I pushed past it:**
+What the limit keys on: rate_limit_key in app.py counts requests per creator_id when the request body has a non-blank string creator_id, and per IP address otherwise (invalid JSON, a missing or blank creator_id). The limiter runs before my validation, so a malformed request still uses up one of the 5 and the request that goes over gets a 429 instead of a 400.
+
+The weakness: the creator_id is chosen by the caller. A script that sends a new creator_id with each request gets a fresh allowance every time, so it is never limited at any speed. My flood test only produced 429s because --flood reuses one creator_id. Keying on the IP address instead would stop that, at the cost that everyone behind the same connection would share one limit. I kept the starter's per-creator key for this unit and note the weakness here instead of fixing it, because the rate limiter and the log are the only changes this unit allows apart from my one improvement.
 
 <!-- python run_attacks.py --flood 15 -->
 
+Flood test (python run_attacks.py --flood 15, 15 submissions from one creator_id):
+```
+15 submissions as 'flood_tester' against http://127.0.0.1:5001
+
+  [ 1/15] 200
+  [ 2/15] 200
+  [ 3/15] 200
+  [ 4/15] 200
+  [ 5/15] 200
+  [ 6/15] 429
+  [ 7/15] 429
+  [ 8/15] 429
+  [ 9/15] 429
+  [10/15] 429
+  [11/15] 429
+  [12/15] 429
+  [13/15] 429
+  [14/15] 429
+  [15/15] 429
+
+200 200 200 200 200 429 429 429 429 429 429 429 429 429 429
+
+10 of 15 were rate limited.
 ```
 
+The five requests inside the limit were accepted and the ten after were rejected. The service records each rejection in logs/audit.jsonl, with no content_id, for example:
+```
+{
+  "creator_id": "flood_tester",
+  "event": "rejected",
+  "limit": "5 per 1 minute",
+  "reason": "rate_limited",
+  "status": "rejected",
+  "timestamp": "2026-11-08T19:22:05+00:00"
+}
+```
+
+Refusals from my own route are logged too, with audit.log_rejection. An empty text, a missing text field and a text under 3 tokens each leave a rejected entry with the reason and the text length, and never the text itself:
+```
+{
+  "creator_id": "log_check",
+  "event": "rejected",
+  "reason": "empty_text",
+  "status": "rejected",
+  "text_length": 0,
+  "timestamp": "2026-11-08T19:24:53+00:00"
+}
 ```
 
 ---

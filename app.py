@@ -154,7 +154,7 @@ def health():
 # ── YOU BUILD THIS ────────────────────────────────────────────────────────────
 
 @app.post("/submit")
-# @limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE}/minute;{config.RATE_LIMIT_PER_DAY}/day")
+@limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE}/minute;{config.RATE_LIMIT_PER_DAY}/day")
 def submit():
     """
     Take a piece of text, decide about it, log the decision, answer.
@@ -206,6 +206,7 @@ def submit():
 
     # A bare list or string parses as JSON but has no fields to read.
     if not isinstance(payload, dict):
+        audit.log_rejection(creator_id="unknown", reason="bad_request")
         return jsonify({
             "error": "bad_request",
             "message": "The body must be a JSON object with \"text\" and \"creator_id\".",
@@ -214,18 +215,28 @@ def submit():
     text = payload.get("text")
     creator_id = payload.get("creator_id")
 
+    # Rejections log the length, never the text itself.
+    log_creator = creator_id if isinstance(creator_id, str) and creator_id.strip() else "unknown"
+
     if not isinstance(text, str):
+        audit.log_rejection(creator_id=log_creator, reason="bad_request")
         return jsonify({
             "error": "bad_request",
             "message": "\"text\" is missing or is not a string.",
         }), 400
     if not isinstance(creator_id, str):
+        audit.log_rejection(
+            creator_id=log_creator, reason="bad_request", text_length=len(text)
+        )
         return jsonify({
             "error": "bad_request",
             "message": "\"creator_id\" is missing or is not a string.",
         }), 400
 
     if not text.strip():
+        audit.log_rejection(
+            creator_id=log_creator, reason="empty_text", text_length=len(text)
+        )
         return jsonify({
             "error": "empty_text",
             "message": "\"text\" is empty. Send some writing to check.",
@@ -236,11 +247,17 @@ def submit():
     try:
         model_score = round(detector.model_signal(text), 4)
     except ValueError:
+        audit.log_rejection(
+            creator_id=log_creator, reason="text_too_short", text_length=len(text)
+        )
         return jsonify({
             "error": "text_too_short",
             "message": "This text is too short to check. Send a few sentences at least.",
         }), 400
     except detector.DetectorUnavailable:
+        audit.log_rejection(
+            creator_id=log_creator, reason="detector_unavailable", text_length=len(text)
+        )
         return jsonify({
             "error": "detector_unavailable",
             "message": "The checker isn't ready yet. Try again shortly.",
