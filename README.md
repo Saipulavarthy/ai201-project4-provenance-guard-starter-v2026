@@ -634,22 +634,40 @@ Pattern: the misses and the near-misses share one cause. The system's scores tra
 
 ## The Improvement
 
-**What I changed:**
+What I changed: one change, a length check on POST /submit. config.py now has MAX_TEXT_CHARS = 20000, and app.py::submit rejects longer text before either signal runs, with a 400 {"error": "text_too_long"} and an audit.log_rejection entry (reason "text_too_long", with text_length and never the text). Weights, thresholds, labels and both signals are unchanged.
 
-**Which diagnosis pointed at it:**
+Which diagnosis pointed at it: criterion 5. The 100,000-character repeated-word text returned 200 and the label ai at 0.9985 in the before run. The stage was the route and the mechanism was that nothing checked the input before the signals ran.
+
+Run Log — After (python run_eval.py --label after, three trials, results/run_2026-11-08_2200_after.md):
+
+| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. My own writing flagged as AI | at most 1 of 10 | 0/10 | 0/10 | 0/10 | MET (with the earlier caveat) |
+| 2. Score spread | AI above human in 5 of 5, average gap at least 0.30 | 5/5, gap 0.400 | 5/5, gap 0.400 | 5/5, gap 0.400 | MET |
+| 3. All three labels reachable | 3 of 3 | 3/3 | 3/3 | 3/3 | MET |
+| 4. Appeals recorded | 10 of 10 | not repeated | not repeated | not repeated | MET in the before run; /appeal was not touched by this change |
+| 5. Bad input rejected cleanly | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+
+Before and after:
+
+| Criterion | Before | After |
+|---|---|---|
+| 1 | 0/10, MET | 0/10, MET |
+| 2 | 5/5, gap 0.400, MET | 5/5, gap 0.400, MET |
+| 3 | 3/3, MET | 3/3, MET |
+| 4 | 10/10, MET | not repeated |
+| 5 | 4/5, MISSED | 5/5, MET |
+
+<!-- Widening the unsure band usually fixes one problem and creates another.
+     Reporting that trade honestly is worth full credit. -->
+
+Did it help, and how do I know: yes for criterion 5, and nothing else moved. Every guess and combined score for criteria 1 to 3 was identical between the before and after runs (step 1a), so the change touched only the input check. The fix is narrow. It fixes the contract that oversized text is refused, but not the evasion behind it: in a quick check an 18,000-character repeated paragraph (1cac98b3-e11c-4701-b2c6-a3206e0f4a0b in logs/audit.jsonl) still got a 200 and the label ai at a combined score of 0.9983, because repetition looks perfectly machine-written to both signals. The change also has a cost: a genuine text over 20,000 characters, roughly 3,500 words, is now refused, although the detector only reads its first 400 tokens anyway.
 
 ### Attack Run — After
 
 <!-- Same format. `run_attacks.py --label after` -->
 
-
-
-**Did it help, and how do I know:**
-
-<!-- Widening the unsure band usually fixes one problem and creates another.
-     Reporting that trade honestly is worth full credit. -->
-
-
+Attack Run — After: not run. I never received attack_set.zip, so there is no attack comparison, and the before and after results above cover my own five criteria only.
 
 ---
 

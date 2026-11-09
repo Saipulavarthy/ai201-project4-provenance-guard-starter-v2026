@@ -46,6 +46,11 @@ DETECTOR_MODEL = os.getenv("AI201_DETECTOR_MODEL", "gpt2")
 # 300 words, which is enough for the signal to mean something.
 DETECTOR_MAX_TOKENS = 400
 
+# Longest text /submit will score. Longer input is rejected before either
+# signal runs. Added after a 100,000-character repeated-word text was labeled
+# ai at 0.999.
+MAX_TEXT_CHARS = 20000
+
 
 # ─── The style signal (Milestone 4) ──────────────────────────────────────────
 # Where each raw measure maps onto AI-likeness. A value at or below *_AI_AT

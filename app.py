@@ -242,6 +242,15 @@ def submit():
             "message": "\"text\" is empty. Send some writing to check.",
         }), 400
 
+    if len(text) > config.MAX_TEXT_CHARS:
+        audit.log_rejection(
+            creator_id=log_creator, reason="text_too_long", text_length=len(text)
+        )
+        return jsonify({
+            "error": "text_too_long",
+            "message": "This text is too long to check. Send up to 20,000 characters.",
+        }), 400
+
     # The model loads once inside detector._load and stays in memory, so only
     # the first submission pays the 10–20 second load.
     try:
