@@ -325,22 +325,157 @@ whose work got caught by it:
 
 <!-- Your five criteria across three trials. `run_eval.py --label before`. -->
 
+Scenarios are in scenarios.py and were run with python run_eval.py --label before, three trials each, changing nothing between trials. All three trials came out identical for every scenario, which is expected because neither signal is random. Results are in results/run_2026-11-08_1453_before.md.
+
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |
+| 1. My own writing flagged as AI | at most 1 of 10 | 0/10 | 0/10 | 0/10 | MET (with caveat) |
+| 2. Score spread, AI above human in 5 of 5 pairs, average gap at least 0.30 | 5 of 5, gap at least 0.30 | 5/5, gap 0.400 | 5/5, gap 0.400 | 5/5, gap 0.400 | MET |
+| 3. All three labels reachable | 3 of 3 | 3/3 | 3/3 | 3/3 | MET |
+| 4. Appeals recorded | 10 of 10 | 10/10 | not repeated | not repeated | MET |
+| 5. Bad input rejected cleanly | 5 of 5 | 4/5 | 4/5 | 4/5 | MISSED |
 
-**Real output from one trial**, pasted as text, naming the file and function
-that produced it:
+Criterion 4 was tested by hand with a temporary script, once, not three times. It submitted 10 texts under 10 creator_ids (all guessed unsure), appealed each, and checked the log: 10 of 10 appeals returned 200 with status under_review, 10 of 10 original decisions were still in the log, and 10 of 10 appeal entries were recorded. An appeal for the content_id "not-a-real-id" returned 404 unknown_content_id and wrote nothing to the log.
 
+Output for each criterion, from run 1 (produced by app.py::submit, scoring.py::score_to_label and app.py::appeal):
+
+Criterion 1, first "my own writing" text:
 ```json
-
+{
+  "status": 200,
+  "guess": "unsure",
+  "confidence": 0.4861,
+  "model_score": 0.4197,
+  "style_score": 0.5858,
+  "label": "We can't tell whether this was written by a person or with an AI tool. Plain or formal writing can look machine-made to our checks, so this is not a judgment about you or your work. If you wrote it yourself, you don't need to do anything.",
+  "sent": "spent most of sunday trying to fix my bike chain and ended up with gre"
+}
 ```
 
-**Diagnoses**
+Criterion 2, first "spread ai" text and first "spread human" text:
+```json
+[
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.6612,
+    "model_score": 0.7445,
+    "style_score": 0.5363,
+    "label": "We can't tell whether this was written by a person or with an AI tool. Plain or formal writing can look machine-made to our checks, so this is not a judgment about you or your work. If you wrote it yourself, you don't need to do anything.",
+    "sent": "Effective time management is a crucial skill in both personal and prof"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.376,
+    "model_score": 0.3238,
+    "style_score": 0.4543,
+    "label": "We can't tell whether this was written by a person or with an AI tool. Plain or formal writing can look machine-made to our checks, so this is not a judgment about you or your work. If you wrote it yourself, you don't need to do anything.",
+    "sent": "honestly i have no idea why my sourdough keeps coming out flat. follow"
+  }
+]
+```
+
+Criterion 3, the three "label coverage" texts:
+```json
+[
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.2825,
+    "model_score": 0.2339,
+    "style_score": 0.3553,
+    "label": "We think this was probably written by a person. No tool can be certain, so this is our best guess and not a verdict.",
+    "sent": "ok so my bus was late again and i swear the driver just stopped for a "
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.7153,
+    "model_score": 0.8049,
+    "style_score": 0.5809,
+    "label": "We can't tell whether this was written by a person or with an AI tool. Plain or formal writing can look machine-made to our checks, so this is not a judgment about you or your work. If you wrote it yourself, you don't need to do anything.",
+    "sent": "Remote work has become an increasingly important topic in modern organ"
+  },
+  {
+    "status": 200,
+    "guess": "ai",
+    "confidence": 0.7678,
+    "model_score": 0.8352,
+    "style_score": 0.6667,
+    "label": "Our checks suggest this may have been written with an AI tool. We can be wrong, especially with short or plain writing. If you wrote it yourself, you can appeal, and your appeal will be recorded and the item marked as under review.",
+    "sent": "The committee met on Tuesday to review the proposed changes to the bud"
+  }
+]
+```
+
+Criterion 4, one row per appeal (app.py::appeal, checked against GET /log):
+
+| # | content_id | appeal code | appeal status | decision in log | appeal in log |
+|---|---|---|---|---|---|
+| 1 | 61c22426-9d24-492a-b92c-b0060e39ad0e | 200 | under_review | yes | yes |
+| 2 | 18bb8239-220a-4a39-b32b-b0eb3aeca069 | 200 | under_review | yes | yes |
+| 3 | 2bb08e82-46cb-4a12-8a49-8d3229535c46 | 200 | under_review | yes | yes |
+| 4 | c72dc2d2-da3c-4767-b820-6a3614eefc3a | 200 | under_review | yes | yes |
+| 5 | 43d39aae-4b6e-4edc-ade3-90a168774fbb | 200 | under_review | yes | yes |
+| 6 | ff0b3a90-bc03-4d1b-8a11-bb0a0439daf2 | 200 | under_review | yes | yes |
+| 7 | 3f3afc72-3e36-4d1b-97c6-5068f8baea5f | 200 | under_review | yes | yes |
+| 8 | f45b849a-a80d-4c4a-ac15-da4b21875a0b | 200 | under_review | yes | yes |
+| 9 | 7b481c97-2e08-425a-aa82-cd9b71fb87f9 | 200 | under_review | yes | yes |
+| 10 | 00ad4f01-1b11-4bd3-b0e8-b48c8e3b5cbd | 200 | under_review | yes | yes |
+
+Criterion 5, all five "bad input" bodies:
+```json
+[
+  {
+    "status": 400,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "{\"creator_id\": \"eval_bad_missing\"}"
+  },
+  {
+    "status": 400,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "(empty text)"
+  },
+  {
+    "status": 400,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "   \n   "
+  },
+  {
+    "status": 200,
+    "guess": "ai",
+    "confidence": 0.9985,
+    "model_score": 0.9975,
+    "style_score": 1.0,
+    "label": "Our checks suggest this may have been written with an AI tool. We can be wrong, especially with short or plain writing. If you wrote it yourself, you can appeal, and your appeal will be recorded and the item marked as under review.",
+    "sent": "word word word word word word word word word word word word word word "
+  },
+  {
+    "status": 400,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "hi"
+  }
+]
+```
+
+Verdicts and diagnoses:
 
 <!-- For each miss AND each broken attack: the stage and the mechanism.
 
@@ -356,7 +491,17 @@ that produced it:
 
      Look for a pattern. Five failures on one signal is one problem, not five. -->
 
+Criterion 1 is MET, but the ten pieces were written by an AI assistant as stand-ins, not by me, so this result shows how the detector treats those registers and not how it treats my own writing. It is also met only because of where the AI threshold sits. My ten pieces scored between 0.486 and 0.705 and the five AI texts between 0.661 and 0.735, so the two ranges overlap and no threshold separates them. At the old threshold of 0.65 six of my ten pieces would have been labeled AI. The highest piece, a formal paragraph about study limitations, scored 0.705, only 0.045 under the AI line.
 
+Criterion 2 is MET: the AI text scored higher than its human partner in all 5 pairs, with an average AI score of 0.703 against 0.303 for the human texts, a gap of 0.400. This is a gap between plain prose and casual prose more than between AI and human. None of the five clearly-AI texts reached the AI label (all were unsure), and the human texts included two that were also unsure.
+
+Criterion 3 is MET on all three trials: the casual text scored 0.282 and was labeled human, the remote work text 0.715 and unsure, and the committee paragraph 0.768 and ai. The AI label was reached only by the committee paragraph, which is plain text I wrote as a stand-in for a human, so the label fires on short plain text and misses the AI paragraphs.
+
+Criterion 4 is MET as described above.
+
+Criterion 5 is MISSED. Four of the five bad inputs (missing text, empty text, whitespace only, and "hi") returned a 400 as intended. The fifth, 100,000 characters of the word "word" repeated, returned 200 with the label ai at a combined score of 0.999. The stage is the route and the mechanism is that app.py::submit has no length check or sanity check on the text before the signals run. The repeated text gives signal one a model score of 1.00 because the language model finds it perfectly predictable, and signal two a style score of 1.00 because it has no variation, so both signals read it as machine-written. This also means repeating one word is an easy way to get a decision labeled AI. The contract in "What This Does" says oversized text returns a 400, but the code never enforced that, so the README claim was wrong. The log confirms the four refused inputs left only rejected entries: 12 across the three trials (3 each, with reasons bad_request, empty_text, empty_text and text_too_short) and no decision entries, while eval_bad_huge left one decision entry per trial.
+
+Pattern: the misses and the near-misses share one cause. The system's scores track how plain or repetitive a text is, not whether a person wrote it, so a plain text can look like AI and degenerate text looks like certain AI, while thresholds protect writers only by sending nearly everything to unsure.
 
 ---
 
