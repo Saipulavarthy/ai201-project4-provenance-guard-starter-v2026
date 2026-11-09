@@ -223,6 +223,8 @@ Moment 2: the combining rule and the AI threshold. After running both signals on
 
 How the code was written: the code in app.py, stylometry.py and scoring.py was written by a VS Code AI coding assistant from prompts I pasted in, one step at a time. After each step I ran the service and checked the responses with curl before moving on. The audit log in logs/audit.jsonl contains my real test submissions, including a few early ones where the test text was an unfilled placeholder phrase.
 
+Unit 8: I used the same AI chat assistant and a VS Code coding assistant, one step at a time, and checked every result with curl or the eval runner before moving on. The ten pieces of writing in scenarios.py under "my own writing" and the other test texts were written by the chat assistant, not by me, so criterion 1 does not test my own writing, and the README says so wherever it reports that result. The chat assistant also suggested the length check as my one improvement, because my own bad-input run showed the route accepted a 100,000-character text, and I accepted it. The coding assistant wrote the rate-limiting changes, the refusal logging, the length check and the temporary script that checked appeals, from prompts I pasted in. I did not write the attack set, and I never received it, so nothing in this unit was tested against it.
+
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
 ---
@@ -676,14 +678,22 @@ Attack Run — After: not run. I never received attack_set.zip, so there is no a
 <!-- For each attack still getting through and each criterion still missed:
      what you'd do, and why you stopped. -->
 
+All five of my criteria are MET after the improvement, but several of those passes are weaker than they look, and the attack set was never run, so there are failures I have not seen.
 
+Still getting through:
+1. Repeated text still gets labeled AI. An 18,000-character paragraph repeated 250 times was labeled ai at a combined score of 0.9983, because repetition looks perfectly machine-written to both signals. The length check only stops this past 20,000 characters. What I would do: add a repetition check before the signals, for example reject or route to unsure any text whose most common sentence makes up a large share of the text. I stopped because this unit allows one improvement and the length check was the one my diagnosis named.
+2. My detector does not separate human writing from AI writing, it separates plain or repetitive text from casual text. My ten stand-in human pieces scored 0.486 to 0.705 and my five AI texts scored 0.661 to 0.735, so the ranges overlap and no threshold separates them. None of the five clearly-AI texts reached the AI label. What I would do: replace or add a signal that does not reward plain prose, and test it on real human writing. I stopped because that is a new signal, not one change.
+3. The rate limit is easy to dodge. It counts requests per creator_id, and the caller chooses the creator_id, so a script that sends a new one with every request is never limited. What I would do: key the limit on the IP address as well. I stopped because the rate limiter was a required change in this unit and I recorded this weakness in the Rate Limiting section instead of redesigning it.
+4. Unknown failures. I never received attack_set.zip, so I do not know which staff attacks would get through. Evasion by typos, rewording and prompt injection are untested.
 
-**The trade I'd make if this ran for real:**
+Criterion I would tighten: criterion 1. It passed 0 of 10 only because the AI threshold sits at 0.75, the ten pieces were written by an AI assistant and not by me, and the highest scored 0.705. I would run it again on ten pieces I wrote myself and require that none score within 0.05 of the AI line.
+
+The gap between what the system was meant to do and what it does: I meant it to estimate whether a person wrote a text. It estimates how predictable and uniform the text is, so plain, formal and repetitive writing reads as machine-made and everything uncertain is pushed into unsure.
 
 <!-- Two sentences. Fewer wrong accusations means more AI text getting through.
      Say which way you'd go and WHO PAYS FOR IT. -->
 
-
+The trade if this ran for real: fewer wrong accusations means more AI text getting through. I would keep the AI label hard to reach, as it is, because a false accusation costs a writer their credibility and their work, while a missed detection costs the site some trust. The people who pay for that choice are the other writers and readers who see AI text labeled unsure, and honest writers still pay when they have to appeal, because an appeal is only recorded and nobody re-checks it automatically.
 
 <!-- ═════════════════════════════════════════════════════════════════════
 
