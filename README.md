@@ -304,20 +304,147 @@ Refusals from my own route are logged too, with audit.log_rejection. An empty te
 <!-- Every attack with its outcome and a held-or-broke mark.
      `run_attacks.py --label before` produces the table. -->
 
+I did not run the staff attack set. My TF did not send attack_set.zip, I asked for it and received no reply, and the unit says not to go looking for it early, so python run_attacks.py --set was never run. There are therefore no held-or-broke marks for the staff attacks, and I have not written a substitute set to stand in for it. What I have instead is the flood test in the Rate Limiting section, the five-criteria runs in Run Log and Verdicts, and my audit log. The ten entries below come from those runs, not from an attack run: the flood test, the bad-input scenarios, and the five-criteria scenarios.
 
-
-**Ten audit log entries from the run**
+The worst outcome I found is entry 5: a text made of the word "word" repeated 20,000 times was labeled ai at a combined score of 0.999 and returned a 200, because the route has no length or sanity check. A real writer is not harmed by this input, but anyone can use repetition to force an AI label on a submission.
 
 <!-- Choose entries that show the interesting failures, not the ten easiest. -->
 
-```json
+The score of each entry is in the JSON. The ten entries:
 
+1. Flood test: a request past the 5-per-minute limit, rejected and logged.
+```json
+{
+  "timestamp": "2026-11-08T19:22:05+00:00",
+  "creator_id": "flood_tester",
+  "event": "rejected",
+  "status": "rejected",
+  "reason": "rate_limited",
+  "limit": "5 per 1 minute"
+}
 ```
 
-**The single worst outcome** — the one I'd least want to explain to a writer
-whose work got caught by it:
+2. Bad-input scenario: empty text, refused by the route.
+```json
+{
+  "timestamp": "2026-11-08T19:53:55+00:00",
+  "creator_id": "eval_bad_empty",
+  "event": "rejected",
+  "status": "rejected",
+  "reason": "empty_text",
+  "text_length": 0
+}
+```
 
+3. Bad-input scenario: no text field at all, refused by the route.
+```json
+{
+  "timestamp": "2026-11-08T19:53:55+00:00",
+  "creator_id": "eval_bad_missing",
+  "event": "rejected",
+  "status": "rejected",
+  "reason": "bad_request"
+}
+```
 
+4. Bad-input scenario: "hi", too short for the model, refused by the route.
+```json
+{
+  "timestamp": "2026-11-08T19:53:55+00:00",
+  "creator_id": "eval_bad_short",
+  "event": "rejected",
+  "status": "rejected",
+  "reason": "text_too_short",
+  "text_length": 2
+}
+```
+
+5. Bad-input scenario: "word" repeated 20,000 times, accepted and labeled ai at 0.9985.
+```json
+{
+  "timestamp": "2026-11-08T19:53:55+00:00",
+  "content_id": "6692e9dc-8315-4ff1-a920-6395ecab9220",
+  "creator_id": "eval_bad_huge",
+  "guess": "ai",
+  "model_score": 0.9975,
+  "style_score": 1.0,
+  "combined_score": 0.9985,
+  "label": "Our checks suggest this may have been written with an AI tool. We can be wrong, especially with short or plain writing. If you wrote it yourself, you can appeal, and your appeal will be recorded and the item marked as under review.",
+  "status": "decided"
+}
+```
+
+6. Label coverage: the plain committee paragraph, written as a stand-in for human text, labeled ai.
+```json
+{
+  "timestamp": "2026-11-08T19:53:54+00:00",
+  "content_id": "baf8861f-108e-4419-9f67-ab2f2a278e6d",
+  "creator_id": "eval_label covera_3",
+  "guess": "ai",
+  "model_score": 0.8352,
+  "style_score": 0.6667,
+  "combined_score": 0.7678,
+  "label": "Our checks suggest this may have been written with an AI tool. We can be wrong, especially with short or plain writing. If you wrote it yourself, you can appeal, and your appeal will be recorded and the item marked as under review.",
+  "status": "decided"
+}
+```
+
+7. My own writing: the highest-scoring piece, the formal study-limitations paragraph, 0.045 under the AI line.
+```json
+{
+  "timestamp": "2026-11-08T19:53:50+00:00",
+  "content_id": "ecb164b4-1bc8-4982-8c75-503d7f55febb",
+  "creator_id": "eval_my own writi_10",
+  "guess": "unsure",
+  "model_score": 0.7565,
+  "style_score": 0.6272,
+  "combined_score": 0.7048,
+  "label": "We can't tell whether this was written by a person or with an AI tool. Plain or formal writing can look machine-made to our checks, so this is not a judgment about you or your work. If you wrote it yourself, you don't need to do anything.",
+  "status": "decided"
+}
+```
+
+8. Score spread: a clearly-AI paragraph that only reached unsure.
+```json
+{
+  "timestamp": "2026-11-08T19:53:52+00:00",
+  "content_id": "24c66094-9cae-4ab9-a1c6-88f59ae89291",
+  "creator_id": "eval_spread ai_1",
+  "guess": "unsure",
+  "model_score": 0.7445,
+  "style_score": 0.5363,
+  "combined_score": 0.6612,
+  "label": "We can't tell whether this was written by a person or with an AI tool. Plain or formal writing can look machine-made to our checks, so this is not a judgment about you or your work. If you wrote it yourself, you don't need to do anything.",
+  "status": "decided"
+}
+```
+
+9. Appeal check: an appeal, recorded with status under_review.
+```json
+{
+  "timestamp": "2026-11-09T02:10:56+00:00",
+  "content_id": "61c22426-9d24-492a-b92c-b0060e39ad0e",
+  "creator_id": "appeal_check_1",
+  "event": "appeal",
+  "status": "under_review",
+  "reasoning": "I wrote this myself."
+}
+```
+
+10. Appeal check: the original decision for the same content_id, still in the log with status decided.
+```json
+{
+  "timestamp": "2026-11-09T02:10:55+00:00",
+  "content_id": "61c22426-9d24-492a-b92c-b0060e39ad0e",
+  "creator_id": "appeal_check_1",
+  "guess": "unsure",
+  "model_score": 0.3869,
+  "style_score": 0.5675,
+  "combined_score": 0.4591,
+  "label": "We can't tell whether this was written by a person or with an AI tool. Plain or formal writing can look machine-made to our checks, so this is not a judgment about you or your work. If you wrote it yourself, you don't need to do anything.",
+  "status": "decided"
+}
+```
 
 ---
 
